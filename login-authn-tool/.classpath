@@ -3,5 +3,9 @@
 	<classpathentry excluding="**/.DS_Store" kind="src" path="tool/src/java"/>
 	<classpathentry sourcepath="JRE_SRC" kind="var" path="JRE_LIB"/>
 	<classpathentry kind="var" path="MAVEN_REPO/servletapi/jars/servletapi-2.4.jar"/>
+	<classpathentry kind="var" path="MAVEN_REPO/commons-logging/jars/commons-logging-1.0.4.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/component-api"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/tool-api"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/util"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
