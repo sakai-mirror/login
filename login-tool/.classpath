@@ -10,6 +10,6 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/util"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/user-util"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/user-api"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/login-util"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/event-api"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
