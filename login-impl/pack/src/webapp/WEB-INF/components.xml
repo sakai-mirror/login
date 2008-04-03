@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+
+<beans>
+
+
+	<bean id="org.sakaiproject.captcha.api.CaptchaService"
+			class="org.sakaiproject.captcha.impl.ReCaptchaServiceImpl"
+			init-method="init"
+			singleton="true">
+			
+			<lookup-method name="serverConfigurationService" bean="org.sakaiproject.component.api.ServerConfigurationService"/>
+			
+	</bean>
+
+
+	<bean id="org.sakaiproject.login.api.LoginService"
+			class="org.sakaiproject.login.impl.LoginServiceComponent"
+			init-method="init"
+			singleton="true">
+			
+			<lookup-method name="captchaService" bean="org.sakaiproject.captcha.api.CaptchaService"/>
+			<lookup-method name="serverConfigurationService" bean="org.sakaiproject.component.api.ServerConfigurationService"/>
+			
+			<property name="loginContextCache"><ref bean="org.sakaiproject.login.api.LoginService.loginContextCache"/></property>
+			
+	</bean>
+	
+ 	<!-- cache definitions -->
+ 	<bean id="org.sakaiproject.login.api.LoginService.loginContextCache"
+  			class="org.springframework.cache.ehcache.EhCacheFactoryBean">
+  		<property name="cacheManager"><ref bean="org.sakaiproject.memory.api.MemoryService.cacheManager"/></property>
+    	<property name="cacheName"><value>org.sakaiproject.login.api.LoginService.loginContextCache</value></property>
+    	<property name="maxElementsInMemory" ><value>20000</value></property>
+    	<property name="diskPersistent" ><value>true</value></property>
+    	<property name="eternal" ><value>false</value></property>
+    	<property name="timeToLive" ><value>3600</value></property>
+    	<property name="timeToIdle" ><value>3600</value></property>
+  	</bean>
+
+</beans>

@@ -34,6 +34,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.event.cover.UsageSessionService;
+import org.sakaiproject.login.api.LoginCredentials;
+import org.sakaiproject.login.cover.LoginService;
+import org.sakaiproject.login.exceptions.LoginCredentialsNotDefinedException;
 import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.api.Tool;
 import org.sakaiproject.tool.cover.SessionManager;
@@ -71,7 +74,7 @@ public class LoginTool extends HttpServlet
 	public static final String PDA_PORTAL_SUFFIX = "/pda/";
 
 	private static ResourceLoader rb = new ResourceLoader("auth");
-
+	
 	/**
 	 * Access the Servlet's information display.
 	 *
@@ -94,6 +97,7 @@ public class LoginTool extends HttpServlet
 		super.init(config);
 
 		M_log.info("init()");
+		
 	}
 
 	/**
@@ -197,39 +201,121 @@ public class LoginTool extends HttpServlet
 	 */
 	protected void sendForm(HttpServletRequest req, HttpServletResponse res) throws IOException
 	{
-		final String headHtml = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">"
-				+ "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\" xml:lang=\"en\">"
-				+ "  <head>"
-				+ "    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />"
-				+ "    <link href=\"SKIN_ROOT/tool_base.css\" type=\"text/css\" rel=\"stylesheet\" media=\"all\" />"
-				+ "    <link href=\"SKIN_ROOT/DEFAULT_SKIN/tool.css\" type=\"text/css\" rel=\"stylesheet\" media=\"all\" />"
-				+ "    <meta http-equiv=\"Content-Style-Type\" content=\"text/css\" />"
-				+ "    <title>UI.SERVICE</title>"
-				+ "    <script type=\"text/javascript\" language=\"JavaScript\" src=\"/library/js/headscripts.js\"></script>"
-				+ "    <meta name=\"viewport\" content=\"width=320, user-scalable=no\">"
-				+ "  </head>"
-				+ "  <body onload=\" setFocus(focus_path);parent.updCourier(doubleDeep, ignoreCourier);\">"
-				+ "<script type=\"text/javascript\" language=\"JavaScript\">" + "  focus_path = [\"eid\"];" + "</script>";
+		final String headHtml = new StringBuilder()
+				.append("<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">")
+				.append("<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\" xml:lang=\"en\">")
+				.append("  <head>")
+				.append("    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />")
+				.append("    <link href=\"SKIN_ROOT/tool_base.css\" type=\"text/css\" rel=\"stylesheet\" media=\"all\" />")
+				.append("    <link href=\"SKIN_ROOT/DEFAULT_SKIN/tool.css\" type=\"text/css\" rel=\"stylesheet\" media=\"all\" />")
+				.append("    <meta http-equiv=\"Content-Style-Type\" content=\"text/css\" />")
+				.append("    <title>UI.SERVICE</title>")
+				.append("    <script type=\"text/javascript\" language=\"JavaScript\" src=\"/library/js/headscripts.js\"></script>")
+				.append("    <meta name=\"viewport\" content=\"width=320, user-scalable=no\">")
+				.append("  </head>")
+				.append("  <body onload=\" setFocus(focus_path);parent.updCourier(doubleDeep, ignoreCourier);\">")
+				.append("<script type=\"text/javascript\" language=\"JavaScript\">").append("  focus_path = [\"eid\"];").append("</script>").toString();
 
 		final String tailHtml = "</body></html>";
 
-		final String loginHtml = "<table class=\"login\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" summary=\"layout\">" + "		<tr>"
-				+ "			<th colspan=\"2\">" + "				Login Required" + "			</th>" + "		</tr>" + "		<tr>" + "			<td class=\"logo\">"
-				+ "			</td>" + "			<td class=\"form\">"
-				+ "				<form method=\"post\" action=\"ACTION\" enctype=\"application/x-www-form-urlencoded\">"
-				+ "                                        MSG" + "							<table border=\"0\" class=\"loginform\" summary=\"layout\">"
-				+ "								<tr>" + "									<td>" + "										<label for=\"eid\">EID</label>" + "									</td>"
-				+ "									<td>" + "										<input name=\"eid\" id=\"eid\"  type=\"text\"/>" + "									</td>"
-				+ "								</tr>" + "								<tr>" + "									<td>" + "										<label for=\"pw\">PW</label>" + "									</td>"
-				+ "									<td>" + "										<input name=\"pw\" id=\"pw\"  type=\"password\"/>" + "									</td>"
-				+ "								</tr>" + "								<tr>" + "									<td colspan=\"2\">"
-				+ "										<input name=\"submit\" type=\"submit\" id=\"submit\" value=\"LoginSubmit\"/>" + "									</td>"
-				+ "								</tr>" + "							</table>" + "						</form>" + "					</td>" + "				</tr>" + "			</table>";
-
-
+		String eid = req.getParameter("eid");
+		String pw = req.getParameter("pw");
+		
 		// get the Sakai session
 		Session session = SessionManager.getCurrentSession();
+		
+		StringBuilder loginHtmlBuilder = new StringBuilder()
+				.append("<table class=\"login\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" summary=\"layout\">")
+				.append("		<tr>")
+				.append("			<th colspan=\"2\">")
+				.append("				Login Required")
+				.append("			</th>")
+				.append("		</tr>")
+				.append("		<tr>")
+				.append("			<td class=\"logo\">")
+				.append("			</td>")
+				.append("			<td class=\"form\">")
+				.append("				<form method=\"post\" action=\"ACTION\" enctype=\"application/x-www-form-urlencoded\">")
+				.append("                                        MSG");
+		
+		loginHtmlBuilder
+				.append("							<table border=\"0\" class=\"loginform\" summary=\"layout\">")
+				.append("								<tr>").append("									<td>")
+				.append("										<label for=\"eid\">EID</label>")
+				.append("									</td>")
+				.append("									<td>");
+		
+		if (eid != null && eid.length() > 0)
+			loginHtmlBuilder
+				.append("										<input name=\"eid\" id=\"eid\" value=\"")
+				.append(eid).append("\" type=\"text\"/>");
+		else
+			loginHtmlBuilder
+				.append("										<input name=\"eid\" id=\"eid\"  type=\"text\"/>");
+		
+		loginHtmlBuilder
+				.append("									</td>")
+				.append("								</tr>")
+				.append("								<tr>")
+				.append("									<td>")
+				.append("										<label for=\"pw\">PW</label>")
+				.append("									</td>")
+				.append("									<td>");
+		
+		if (pw != null && pw.length() > 0)
+			loginHtmlBuilder
+				.append( "										<input name=\"pw\" id=\"pw\" value=\"")
+				.append(pw).append("\" type=\"password\"/>");
+		else 
+			loginHtmlBuilder
+				.append( "										<input name=\"pw\" id=\"pw\"  type=\"password\"/>");
+		
+		loginHtmlBuilder
+				.append("									</td>")
+				.append("								</tr>")
+				.append("								<tr>")
+				.append("									<td colspan=\"2\">");
 
+		
+		// Only bother checking login credentials and/or imposing a penalty when the protection level is set
+		if (LoginService.getProtectionLevel() != LoginService.PROTECTION_LEVEL_NONE) {
+		
+			LoginCredentials credentials = new LoginCredentials(eid, pw, req.getRemoteAddr());
+			credentials.setParameterMap(req.getParameterMap());
+			
+			boolean isFailed = true;
+			
+			try {
+				isFailed = !LoginService.checkLoginCredentials(credentials);
+			} catch (LoginCredentialsNotDefinedException nde) {
+				
+			}
+			
+			if (isFailed) {
+				loginHtmlBuilder.append(LoginService.getPenaltyMarkup());
+			}
+			
+		}
+		
+		loginHtmlBuilder
+				.append("								</td>")
+				.append("								</tr>")
+				.append("								<tr>")
+				.append("									<td colspan=\"2\">")
+				.append("										<input name=\"submit\" type=\"submit\" id=\"submit\" value=\"LoginSubmit\"/>")
+				.append("									</td>")
+				.append("								</tr>")
+				.append("							</table>")
+				.append("						</form>")
+				.append("					</td>")
+				.append("				</tr>")
+				.append("			</table>");
+
+		
+		final String loginHtml = loginHtmlBuilder.toString();
+		
+
+		
 		// get my tool registration
 		Tool tool = (Tool) req.getAttribute(Tool.TOOL);
 
@@ -311,6 +397,7 @@ public class LoginTool extends HttpServlet
 		// write the login screen
 		out.println(html);
 
+		
 		if (!fragment)
 		{
 			// close the complete document
@@ -330,6 +417,9 @@ public class LoginTool extends HttpServlet
 	 */
 	protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
 	{
+		// Only bother checking login credentials and/or imposing a penalty when the protection level is set
+		boolean isAdditionalProtectionEnabled = LoginService.getProtectionLevel() != LoginService.PROTECTION_LEVEL_NONE;
+		
 		// get the Sakai session
 		Session session = SessionManager.getCurrentSession();
 
@@ -359,14 +449,30 @@ public class LoginTool extends HttpServlet
 		// submit
 		else
 		{
+			LoginCredentials credentials = new LoginCredentials(eid, pw, req.getRemoteAddr());
+			credentials.setParameterMap(req.getParameterMap());
+			
 			// authenticate
 			try
 			{
-				if ((eid == null) || (pw == null) || (eid.length() == 0) || (pw.length() == 0))
-				{
-					throw new AuthenticationException("missing required fields");
+				boolean isEidEmpty = (eid == null) || (eid.length() == 0);
+				boolean isPwEmpty = (pw == null) || (pw.length() == 0);
+				
+				if (isAdditionalProtectionEnabled) {
+					if (!LoginService.checkLoginCredentials(credentials)) {
+						// If credentials failed, then force a refresh of the screen, including the penalty, if appropriate
+						session.setAttribute(ATTR_MSG, rb.getString("log.credsfailed"));
+						
+						sendForm(req, res);
+						return;
+					}
 				}
-
+				
+				if (isEidEmpty || isPwEmpty)
+				{
+					throw new AuthenticationException("missing required fields");	
+				}
+				
 				// Do NOT trim the password, since many authentication systems allow whitespace.
 				eid = eid.trim();
 
@@ -377,6 +483,8 @@ public class LoginTool extends HttpServlet
 				// login the user
 				if (UsageSessionService.login(a, req))
 				{
+					if (isAdditionalProtectionEnabled) 
+						LoginService.setSuccessfulLogin(credentials);
 					// get the session info complete needs, since the logout will invalidate and clear the session
 					String returnUrl = (String) session.getAttribute(Tool.HELPER_DONE_URL);
 
@@ -384,17 +492,26 @@ public class LoginTool extends HttpServlet
 				}
 				else
 				{
+					if (isAdditionalProtectionEnabled) 
+						LoginService.setFailedLogin(credentials);
 					session.setAttribute(ATTR_MSG, rb.getString("log.tryagain"));
 					res.sendRedirect(res.encodeRedirectURL(Web.returnUrl(req, null)));
 				}
 			}
 			catch (AuthenticationException ex)
 			{
+				if (isAdditionalProtectionEnabled) 
+					LoginService.setFailedLogin(credentials);
 				session.setAttribute(ATTR_MSG, rb.getString("log.invalid"));
 
-				// respond with a redirect back here
-				res.sendRedirect(res.encodeRedirectURL(Web.returnUrl(req, null)));
+				sendForm(req, res);
 			}
+			catch (LoginCredentialsNotDefinedException nde) {
+				session.setAttribute(ATTR_MSG, rb.getString("log.credsnotdefined"));
+
+				sendForm(req, res);
+			}
+			
 		}
 	}
 
