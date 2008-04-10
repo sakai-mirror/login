@@ -26,6 +26,7 @@
       <groupId>org.sakaiproject</groupId>
       <artifactId>sakai-gatekeeper-api</artifactId>
       <version>${sakai.version}</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.sakaiproject</groupId>
