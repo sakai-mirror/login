@@ -34,9 +34,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.event.cover.UsageSessionService;
-import org.sakaiproject.login.api.LoginCredentials;
-import org.sakaiproject.login.cover.LoginService;
-import org.sakaiproject.login.exceptions.LoginCredentialsNotDefinedException;
+import org.sakaiproject.gatekeeper.api.GateKeeperCredentials;
+import org.sakaiproject.gatekeeper.cover.GateKeeperService;
+import org.sakaiproject.gatekeeper.exceptions.GateKeeperCredentialsNotDefinedException;
 import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.api.Tool;
 import org.sakaiproject.tool.cover.SessionManager;
@@ -276,23 +276,25 @@ public class LoginTool extends HttpServlet
 				.append("								<tr>")
 				.append("									<td colspan=\"2\">");
 
+		int protectionLevel = GateKeeperService.getProtectionLevel();
 		
 		// Only bother checking login credentials and/or imposing a penalty when the protection level is set
-		if (LoginService.getProtectionLevel() != LoginService.PROTECTION_LEVEL_NONE) {
+		if (GateKeeperService.getProtectionLevel() != GateKeeperService.PROTECTION_LEVEL_NONE) {
 		
-			LoginCredentials credentials = new LoginCredentials(eid, pw, req.getRemoteAddr());
+			GateKeeperCredentials credentials = new GateKeeperCredentials(eid, pw, req.getRemoteAddr());
 			credentials.setParameterMap(req.getParameterMap());
+			credentials.setSessionId(session.getId());
 			
 			boolean isFailed = true;
 			
 			try {
-				isFailed = !LoginService.checkLoginCredentials(credentials);
-			} catch (LoginCredentialsNotDefinedException nde) {
+				isFailed = !GateKeeperService.checkGateKeeperCredentials(credentials);
+			} catch (GateKeeperCredentialsNotDefinedException nde) {
 				
 			}
 			
 			if (isFailed) {
-				loginHtmlBuilder.append(LoginService.getPenaltyMarkup());
+				loginHtmlBuilder.append(GateKeeperService.getPenaltyMarkup());
 			}
 			
 		}
@@ -386,7 +388,7 @@ public class LoginTool extends HttpServlet
 		String msg = (String) session.getAttribute(ATTR_MSG);
 		if (msg != null)
 		{
-			html = html.replaceAll("MSG", "<div class=\"alertMessage\">" + rb.getString("gen.alert") + " " + msg + "</div>");
+			html = html.replaceAll("MSG", "<div class=\"alertMessage\" style=\"width: 415px\">" + rb.getString("gen.alert") + " " + msg + "</div>");
 			session.removeAttribute(ATTR_MSG);
 		}
 		else
@@ -418,7 +420,7 @@ public class LoginTool extends HttpServlet
 	protected void doPost(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException
 	{
 		// Only bother checking login credentials and/or imposing a penalty when the protection level is set
-		boolean isAdditionalProtectionEnabled = LoginService.getProtectionLevel() != LoginService.PROTECTION_LEVEL_NONE;
+		boolean isAdditionalProtectionEnabled = GateKeeperService.getProtectionLevel() != GateKeeperService.PROTECTION_LEVEL_NONE;
 		
 		// get the Sakai session
 		Session session = SessionManager.getCurrentSession();
@@ -449,8 +451,9 @@ public class LoginTool extends HttpServlet
 		// submit
 		else
 		{
-			LoginCredentials credentials = new LoginCredentials(eid, pw, req.getRemoteAddr());
+			GateKeeperCredentials credentials = new GateKeeperCredentials(eid, pw, req.getRemoteAddr());
 			credentials.setParameterMap(req.getParameterMap());
+			credentials.setSessionId(session.getId());
 			
 			// authenticate
 			try
@@ -459,9 +462,9 @@ public class LoginTool extends HttpServlet
 				boolean isPwEmpty = (pw == null) || (pw.length() == 0);
 				
 				if (isAdditionalProtectionEnabled) {
-					if (!LoginService.checkLoginCredentials(credentials)) {
+					if (!GateKeeperService.checkGateKeeperCredentials(credentials)) {
 						// If credentials failed, then force a refresh of the screen, including the penalty, if appropriate
-						session.setAttribute(ATTR_MSG, rb.getString("log.credsfailed"));
+						session.setAttribute(ATTR_MSG, rb.getString("log.invalid.credentials"));
 						
 						sendForm(req, res);
 						return;
@@ -484,7 +487,7 @@ public class LoginTool extends HttpServlet
 				if (UsageSessionService.login(a, req))
 				{
 					if (isAdditionalProtectionEnabled) 
-						LoginService.setSuccessfulLogin(credentials);
+						GateKeeperService.setSuccessfulEntrance(credentials);
 					// get the session info complete needs, since the logout will invalidate and clear the session
 					String returnUrl = (String) session.getAttribute(Tool.HELPER_DONE_URL);
 
@@ -493,21 +496,33 @@ public class LoginTool extends HttpServlet
 				else
 				{
 					if (isAdditionalProtectionEnabled) 
-						LoginService.setFailedLogin(credentials);
+						GateKeeperService.setFailedEntrance(credentials);
 					session.setAttribute(ATTR_MSG, rb.getString("log.tryagain"));
 					res.sendRedirect(res.encodeRedirectURL(Web.returnUrl(req, null)));
 				}
 			}
 			catch (AuthenticationException ex)
 			{
-				if (isAdditionalProtectionEnabled) 
-					LoginService.setFailedLogin(credentials);
-				session.setAttribute(ATTR_MSG, rb.getString("log.invalid"));
+				boolean isPenaltyImposed = false;
+				
+				if (isAdditionalProtectionEnabled) {
+					GateKeeperService.setFailedEntrance(credentials);
+					try {
+						isPenaltyImposed = !GateKeeperService.checkGateKeeperCredentials(credentials);
+					} catch (GateKeeperCredentialsNotDefinedException e) {
+						isPenaltyImposed = true;
+					}
+				} 
+				
+				if (isPenaltyImposed)
+					session.setAttribute(ATTR_MSG, rb.getString("log.invalid.with.penalty"));
+				else
+					session.setAttribute(ATTR_MSG, rb.getString("log.invalid"));
 
 				sendForm(req, res);
 			}
-			catch (LoginCredentialsNotDefinedException nde) {
-				session.setAttribute(ATTR_MSG, rb.getString("log.credsnotdefined"));
+			catch (GateKeeperCredentialsNotDefinedException nde) {
+				session.setAttribute(ATTR_MSG, rb.getString("log.invalid.credentials"));
 
 				sendForm(req, res);
 			}
