@@ -18,7 +18,7 @@
  * limitations under the License.
  *
  **********************************************************************************/
-package org.sakaiproject.login.tool.velocity;
+package org.sakaiproject.login.impl.velocity;
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;

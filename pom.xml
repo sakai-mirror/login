@@ -24,6 +24,8 @@
     <module>login-authn-tool/tool</module>
     <module>login-impl/impl</module>
     <module>login-impl/pack</module>
+    <module>login-render-engine-impl/impl</module>
+    <module>login-render-engine-impl/pack</module>
     <module>login-tool/tool</module>
   </modules>
 </project>

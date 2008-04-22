@@ -16,7 +16,7 @@
  * This code was basaed on the simular code in the Velocity Tools project.
  */
 
-package org.sakaiproject.login.tool.velocity;
+package org.sakaiproject.login.impl.velocity;
 
 import java.io.File;
 import java.io.InputStream;

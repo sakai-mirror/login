@@ -1,4 +1,4 @@
-package org.sakaiproject.login.tool.velocity;
+package org.sakaiproject.login.impl.velocity;
 
 import java.util.Collection;
 import java.util.Iterator;

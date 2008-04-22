@@ -7,9 +7,9 @@
     <version>SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
-  <name>sakai-login-impl</name>
+  <name>sakai-login-render-engine-impl</name>
   <groupId>org.sakaiproject</groupId>
-  <artifactId>sakai-login-impl</artifactId>
+  <artifactId>sakai-login-render-engine-impl</artifactId>
   <organization>
     <name>University of California, Davis</name>
     <url>http://sakaiproject.org/</url>
@@ -81,7 +81,36 @@
     </dependency>
   </dependencies>
   <build>
-    <resources/>
-<!-- java source -->
+<resources>
+      <resource>
+        <directory>${basedir}/src/bundle</directory>
+        <includes>
+          <include>**/*.config</include>
+          <include>**/*.properties</include>
+          <include>**/*.vm</include>
+        </includes>
+      </resource>
+    </resources>
+    <sourceDirectory>src/java</sourceDirectory>
+   <testResources>
+      <testResource>
+        <directory>${basedir}/src/testBundle</directory>
+        <includes>
+          <include>**/*.*</include>
+        </includes>
+      </testResource>
+      <testResource>
+        <directory>${basedir}/src/test/</directory>
+        <includes>
+          <include>**/*</include>
+        </includes>
+      </testResource>
+      <testResource>
+        <directory>${basedir}/../pack/src/webapp/</directory>
+        <includes>
+          <include>**/*.*</include>
+        </includes>
+      </testResource>
+    </testResources>
   </build>
 </project>

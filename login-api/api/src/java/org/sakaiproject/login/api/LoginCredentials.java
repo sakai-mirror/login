@@ -35,9 +35,10 @@ public class LoginCredentials {
 	
 	public LoginCredentials(HttpServletRequest request) {
 		this.identifier = request.getParameter("eid");
-		this.password = request.getParameter("password");
+		this.password = request.getParameter("pw");
 		this.remoteAddr = request.getRemoteAddr();
 		this.parameterMap = request.getParameterMap();
+		this.request = request;
 	}
 
 	public LoginCredentials(String identifier, String password, String remoteAddr) {

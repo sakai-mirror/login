@@ -104,21 +104,20 @@ public abstract class LoginServiceComponent implements LoginService {
 		}
 		catch (AuthenticationException ex)
 		{
+			if (ex.getMessage().equals("missing-fields"))
+				throw new LoginException(Login.EXCEPTION_MISSING_CREDENTIALS);
+			
 			boolean isPenaltyImposed = false;
 			
 			if (isAdvisorEnabled) {
 				loginAdvisor.setFailure(credentials);
-				try {
-					isPenaltyImposed = !loginAdvisor.checkCredentials(credentials);
-				} catch (LoginException e) {
-					isPenaltyImposed = true;
-				}
+				isPenaltyImposed = !loginAdvisor.checkCredentials(credentials);
 			} 
 			
 			if (isPenaltyImposed)
 				throw new LoginException(Login.EXCEPTION_INVALID_WITH_PENALTY);
 			else
-				throw new LoginException(Login.EXCEPTION_MISSING_CREDENTIALS);
+				throw new LoginException(Login.EXCEPTION_INVALID);
 		}
 		
 	}
@@ -130,8 +129,7 @@ public abstract class LoginServiceComponent implements LoginService {
 		boolean isAdvisorEnabled = loginAdvisor != null && loginAdvisor.isAdvisorEnabled();
 		
 		if (isAdvisorEnabled) {
-			loginAdvisor.getLoginAdvice(credentials);
-			
+			return loginAdvisor.getLoginAdvice(credentials);
 		}
 		
 		return "";

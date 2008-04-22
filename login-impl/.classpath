@@ -10,5 +10,8 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/user-api"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/user-util"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/event-api"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/tool-api"/>
+	<classpathentry kind="var" path="M2_REPO/velocity/velocity/1.4/velocity-1.4.jar"/>
+	<classpathentry kind="var" path="M2_REPO/velocity/velocity-dep/1.4/velocity-dep-1.4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -63,8 +63,4 @@
         <listener-class>org.sakaiproject.util.ToolListener</listener-class>
     </listener>
 	
-	<listener>
-		<listener-class>org.sakaiproject.login.tool.velocity.LoginRenderEngineContextListener</listener-class>
-	</listener>
-	
 </web-app>

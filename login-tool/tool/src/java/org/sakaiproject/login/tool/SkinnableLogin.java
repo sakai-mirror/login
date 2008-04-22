@@ -224,20 +224,30 @@ public class SkinnableLogin extends HttpServlet implements Login {
 				
 				String message = le.getMessage();
 				
+				log.debug("LoginException: " + message);
+				
+				boolean showAdvice = false;
+				
 				if (message.equals(EXCEPTION_INVALID_CREDENTIALS)) {
 					rcontext.put(ATTR_MSG, rb.getString("log.invalid.credentials"));
-					sendResponse(rcontext, res, "xlogin", null);
+					showAdvice = true;
 				} else if (message.equals(EXCEPTION_INVALID_WITH_PENALTY)) {
 					rcontext.put(ATTR_MSG, rb.getString("log.invalid.with.penalty"));
-					sendResponse(rcontext, res, "xlogin", null);
-				} else if (message.equals(EXCEPTION_MISSING_CREDENTIALS)) {
+					showAdvice = true;
+				} else if (message.equals(EXCEPTION_MISSING_CREDENTIALS)) 
 					rcontext.put(ATTR_MSG, rb.getString("log.tryagain"));
-					sendResponse(rcontext, res, "xlogin", null);
-				} else if (message.equals(EXCEPTION_INVALID)) {
+				else 
 					rcontext.put(ATTR_MSG, rb.getString("log.invalid"));
-					sendResponse(rcontext, res, "xlogin", null);
-//					res.sendRedirect(res.encodeRedirectURL(Web.returnUrl(req, null)));
+
+				if (showAdvice) {
+					String loginAdvice = loginService.getLoginAdvice(credentials);
+					if (loginAdvice != null && !loginAdvice.equals("")) {
+						log.debug("Returning login advice");
+						rcontext.put("loginAdvice", loginAdvice);
+					}
 				}
+				
+				sendResponse(rcontext, res, "xlogin", null);
 			}
 		}
 	}
@@ -301,12 +311,7 @@ public class SkinnableLogin extends HttpServlet implements Login {
 		rcontext.put("loginPwWording", pwWording);
 		rcontext.put("loginRequired", loginRequired);
 		rcontext.put("loginWording", loginWording);
-		
-		LoginCredentials credentials = new LoginCredentials(request);
-		String loginAdvice = loginService.getLoginAdvice(credentials);
-		if (loginAdvice != null)
-			rcontext.put("loginAdvice", loginAdvice);
-		
+			
 		String eid = request.getParameter("eid");
 		String pw = request.getParameter("pw");
 		

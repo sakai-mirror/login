@@ -1,4 +1,4 @@
-package org.sakaiproject.login.tool.velocity;
+package org.sakaiproject.login.impl.velocity;
 
 import java.io.InputStream;
 import java.io.Writer;
@@ -100,9 +100,6 @@ public class VelocityLoginRenderEngine implements LoginRenderEngine {
 		rc.setDebug(debug);
 
 		rc.put("pageSkins", availableLoginSkins);
-		//rc.put("styleableStyleSheet", generateStyleAbleStyleSheet());
-		//rc.put("styleableJS", generateStyleAbleJavaScript());
-		//rc.put("styleable", styleAble);
 		String loginSkin = "defaultskin";
 
 		if (request != null)

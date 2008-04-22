@@ -27,7 +27,25 @@
     </dependency>
   </dependencies>
   <build>
-    <resources/>
-<!-- java source -->
+    <resources>
+      <resource>
+        <directory>${basedir}/src/bundle</directory>
+        <includes>
+          <include>**/*.config</include>
+          <include>**/*.properties</include>
+          <include>**/*.vm</include>
+        </includes>
+      </resource>
+    </resources>
+    <testResources>
+      <testResource>
+        <directory>${basedir}/src/testBundle</directory>
+        <includes>
+          <include>**/*.*</include>
+        </includes>
+        <filtering>false</filtering>
+      </testResource>
+    </testResources>
+    <sourceDirectory>src/java</sourceDirectory>
   </build>
 </project>
