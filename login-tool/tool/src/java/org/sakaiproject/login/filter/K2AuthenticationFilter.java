@@ -1,6 +1,24 @@
-/**
- * 
- */
+/**********************************************************************************
+ * $URL$
+ * $Id$
+ ***********************************************************************************
+ *
+ * Copyright (c) 2005, 2006, 2007, 2008 Sakai Foundation
+ *
+ * Licensed under the Educational Community License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.osedu.org/licenses/ECL-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **********************************************************************************/
+
 package org.sakaiproject.login.filter;
 
 import java.io.IOException;
@@ -19,14 +37,12 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 /**
- * @author lance
  * 
  */
 public class K2AuthenticationFilter implements Filter {
@@ -37,39 +53,33 @@ public class K2AuthenticationFilter implements Filter {
 	protected String loginUrl = "http://localhost:8080/var/cluster/user.cookie.json?c=";
 
 	/**
-	 * @see javax.servlet.Filter#destroy()
-	 */
-	public void destroy() {
-		// nothing to do here
-	}
-
-	/**
 	 * @see javax.servlet.Filter#doFilter(javax.servlet.ServletRequest,
 	 *      javax.servlet.ServletResponse, javax.servlet.FilterChain)
 	 */
-	public void doFilter(ServletRequest request, ServletResponse response,
-			FilterChain chain) throws IOException, ServletException {
+	public void doFilter(ServletRequest servletRequest,
+			ServletResponse response, FilterChain chain) throws IOException,
+			ServletException {
 		if (LOG.isDebugEnabled()) {
-			LOG.debug("doFilter(ServletRequest " + request
+			LOG.debug("doFilter(ServletRequest " + servletRequest
 					+ ", ServletResponse " + response + ", FilterChain "
 					+ chain + ")");
 		}
-		if (request instanceof HttpServletRequest) {
-			final HttpServletRequest req = (HttpServletRequest) request;
-			String secret = getSecret(req);
+		if (servletRequest instanceof HttpServletRequest) {
+			final HttpServletRequest request = (HttpServletRequest) servletRequest;
+			String secret = getSecret(request);
 			if (secret != null) {
 				if (loggedIntoK2(secret)) {
-					chain.doFilter(request, response);
+					chain.doFilter(servletRequest, response);
 					return;
 				}
 			} else {
 				// TODO error / redirect?
 			}
 		} else { // not HttpServletRequest - just proceed
-			chain.doFilter(request, response);
+			chain.doFilter(servletRequest, response);
 			return;
 		}
-		chain.doFilter(request, response);
+		chain.doFilter(servletRequest, response);
 		return;
 	}
 
@@ -85,7 +95,10 @@ public class K2AuthenticationFilter implements Filter {
 
 	private boolean loggedIntoK2(String secret) {
 		// TODO complete this method
-		HttpClient http = new DefaultHttpClient();
+		DefaultHttpClient http = new DefaultHttpClient();
+		// http.getCredentialsProvider().setCredentials(
+		// new AuthScope("localhost", 443),
+		// new UsernamePasswordCredentials("username", "password"));
 		try {
 			URI uri = new URI(loginUrl + secret);
 			HttpGet get = new HttpGet(uri);
@@ -114,6 +127,13 @@ public class K2AuthenticationFilter implements Filter {
 	 */
 	public void init(FilterConfig filterConfig) throws ServletException {
 		// need some sakai.properties here to enable and configure this filter
+	}
+
+	/**
+	 * @see javax.servlet.Filter#destroy()
+	 */
+	public void destroy() {
+		// nothing to do here
 	}
 
 }
