@@ -52,6 +52,11 @@
       <artifactId>commons-logging</artifactId>
       <version>1.0.4</version>
     </dependency>
+    <dependency>
+    	<groupId>org.apache.httpcomponents</groupId>
+    	<artifactId>httpclient</artifactId>
+    	<version>4.0</version>
+    </dependency>
   </dependencies>
   <build>
     <resources>
