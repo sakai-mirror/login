@@ -23,7 +23,6 @@ package org.sakaiproject.login.filter;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -33,10 +32,10 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
@@ -50,37 +49,44 @@ public class K2AuthenticationFilter implements Filter {
 			.getLog(K2AuthenticationFilter.class);
 	private static final String COOKIE_NAME = "SAKAI-TRACKING";
 
-	protected String loginUrl = "http://localhost:8080/var/cluster/user.cookie.json?c=";
+	protected String vaildateUrl = "http://localhost:8080/var/cluster/user.cookie.json?c=";
 
 	/**
 	 * @see javax.servlet.Filter#doFilter(javax.servlet.ServletRequest,
 	 *      javax.servlet.ServletResponse, javax.servlet.FilterChain)
 	 */
 	public void doFilter(ServletRequest servletRequest,
-			ServletResponse response, FilterChain chain) throws IOException,
-			ServletException {
+			ServletResponse servletResponse, FilterChain chain)
+			throws IOException, ServletException {
 		if (LOG.isDebugEnabled()) {
 			LOG.debug("doFilter(ServletRequest " + servletRequest
-					+ ", ServletResponse " + response + ", FilterChain "
+					+ ", ServletResponse " + servletResponse + ", FilterChain "
 					+ chain + ")");
 		}
 		if (servletRequest instanceof HttpServletRequest) {
 			final HttpServletRequest request = (HttpServletRequest) servletRequest;
+			final HttpServletResponse response = (HttpServletResponse) servletResponse;
 			String secret = getSecret(request);
-			if (secret != null) {
-				if (loggedIntoK2(secret)) {
-					chain.doFilter(servletRequest, response);
-					return;
-				}
+			if (secret != null && loggedIntoK2(secret)) {
+				LOG.debug("Already authenticated to K2 proceeding with chain.");
+				// TODO do I need a wrapped request w/ remoteUser?
+				chain.doFilter(servletRequest, servletResponse);
+				return;
 			} else {
 				// TODO error / redirect?
+				LOG.debug("NOT authenticated to K2.");
+				if (!response.isCommitted()) {
+					response.sendError(HttpServletResponse.SC_FORBIDDEN);
+				} else {
+					// what to do here?
+					throw new Error(
+							"response.isCommitted() && response.sendError(HttpServletResponse.SC_FORBIDDEN)");
+				}
 			}
-		} else { // not HttpServletRequest - just proceed
-			chain.doFilter(servletRequest, response);
+		} else { // not HttpServletRequest - just proceed with chain
+			chain.doFilter(servletRequest, servletResponse);
 			return;
 		}
-		chain.doFilter(servletRequest, response);
-		return;
 	}
 
 	private String getSecret(HttpServletRequest req) {
@@ -100,23 +106,17 @@ public class K2AuthenticationFilter implements Filter {
 		// new AuthScope("localhost", 443),
 		// new UsernamePasswordCredentials("username", "password"));
 		try {
-			URI uri = new URI(loginUrl + secret);
-			HttpGet get = new HttpGet(uri);
-			System.out.println("HttpGet: " + get.getURI());
+			URI uri = new URI(vaildateUrl + secret);
+			HttpGet httpget = new HttpGet(uri);
+			System.out.println("HttpGet: " + httpget.getURI());
 			ResponseHandler<String> responseHandler = new BasicResponseHandler();
-			String responseBody = http.execute(get, responseHandler);
+			String responseBody = http.execute(httpget, responseHandler);
 			System.out.println(responseBody
 					+ "------------------------------------------------");
+		} catch (Exception e) {
+			LOG.error(e.getMessage(), e);
+		} finally {
 			http.getConnectionManager().shutdown();
-		} catch (URISyntaxException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClientProtocolException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 
 		return true;
