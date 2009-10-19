@@ -23,6 +23,7 @@ package org.sakaiproject.login.filter;
 
 import java.io.IOException;
 import java.net.URI;
+import java.security.Principal;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -32,10 +33,14 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+
+import net.sf.json.JSONObject;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.client.HttpResponseException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
@@ -48,6 +53,7 @@ public class K2AuthenticationFilter implements Filter {
 	private static final Log LOG = LogFactory
 			.getLog(K2AuthenticationFilter.class);
 	private static final String COOKIE_NAME = "SAKAI-TRACKING";
+	private static final String ANONYMOUS = "anonymous";
 
 	protected String vaildateUrl = "http://localhost:8080/var/cluster/user.cookie.json?c=";
 
@@ -66,16 +72,21 @@ public class K2AuthenticationFilter implements Filter {
 		if (servletRequest instanceof HttpServletRequest) {
 			final HttpServletRequest request = (HttpServletRequest) servletRequest;
 			final HttpServletResponse response = (HttpServletResponse) servletResponse;
-			String secret = getSecret(request);
-			if (secret != null && loggedIntoK2(secret)) {
-				LOG.debug("Already authenticated to K2 proceeding with chain.");
-				// TODO do I need a wrapped request w/ remoteUser?
-				chain.doFilter(servletRequest, servletResponse);
+
+			final Principal principal = getPrincipalLoggedIntoK2(request);
+			if (principal != null) {
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("Authenticated to K2 proceeding with chain: "
+							+ principal.getName());
+				}
+				final K2HttpServletRequestWrapper requestWrapper = new K2HttpServletRequestWrapper(
+						request, principal);
+				chain.doFilter(requestWrapper, servletResponse);
 				return;
 			} else {
-				// TODO error / redirect?
 				LOG.debug("NOT authenticated to K2.");
 				if (!response.isCommitted()) {
+					// TODO redirect to K2 login URL instead of 403
 					response.sendError(HttpServletResponse.SC_FORBIDDEN);
 				} else {
 					// what to do here?
@@ -99,27 +110,45 @@ public class K2AuthenticationFilter implements Filter {
 		return secret;
 	}
 
-	private boolean loggedIntoK2(String secret) {
+	private Principal getPrincipalLoggedIntoK2(HttpServletRequest request) {
 		// TODO complete this method
-		DefaultHttpClient http = new DefaultHttpClient();
-		// http.getCredentialsProvider().setCredentials(
-		// new AuthScope("localhost", 443),
-		// new UsernamePasswordCredentials("username", "password"));
-		try {
-			URI uri = new URI(vaildateUrl + secret);
-			HttpGet httpget = new HttpGet(uri);
-			System.out.println("HttpGet: " + httpget.getURI());
-			ResponseHandler<String> responseHandler = new BasicResponseHandler();
-			String responseBody = http.execute(httpget, responseHandler);
-			System.out.println(responseBody
-					+ "------------------------------------------------");
-		} catch (Exception e) {
-			LOG.error(e.getMessage(), e);
-		} finally {
-			http.getConnectionManager().shutdown();
+		Principal principal = null;
+		final String secret = getSecret(request);
+		if (secret != null) {
+			DefaultHttpClient http = new DefaultHttpClient();
+			// http.getCredentialsProvider().setCredentials(
+			// new AuthScope("localhost", 443),
+			// new UsernamePasswordCredentials("username", "password"));
+			try {
+				URI uri = new URI(vaildateUrl + secret);
+				HttpGet httpget = new HttpGet(uri);
+				// System.out.println("HttpGet: " + httpget.getURI());
+				ResponseHandler<String> responseHandler = new BasicResponseHandler();
+				String responseBody = http.execute(httpget, responseHandler);
+				// System.out.println(responseBody
+				// + "\n------------------------------------------------");
+				JSONObject jsonObject = JSONObject.fromObject(responseBody);
+				String p = jsonObject.getJSONObject("user").getString(
+						"principal");
+				// System.out.println("principal=" + p);
+				if (p != null && !"".equals(p) && !ANONYMOUS.equals(p)) {
+					// only if not null and not "anonymous"
+					principal = new K2Principal(p);
+				}
+			} catch (HttpResponseException e) {
+				// usually a 404 error - could not find cookie / not valid
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("HttpResponseException: " + e.getMessage() + ": "
+							+ e.getStatusCode() + ": " + vaildateUrl + secret);
+				}
+			} catch (Exception e) {
+				LOG.error(e.getMessage(), e);
+			} finally {
+				http.getConnectionManager().shutdown();
+			}
 		}
 
-		return true;
+		return principal;
 	}
 
 	/**
@@ -134,6 +163,86 @@ public class K2AuthenticationFilter implements Filter {
 	 */
 	public void destroy() {
 		// nothing to do here
+	}
+
+	public static class K2Principal implements Principal {
+		private String name = null;
+
+		public K2Principal(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		/**
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (obj == this)
+				return true;
+			if (obj instanceof Principal) {
+				return name.equals(((Principal) obj).getName());
+			}
+			return false;
+		}
+
+		/**
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			return name.hashCode();
+		}
+
+		/**
+		 * @see java.lang.Object#toString()
+		 */
+		@Override
+		public String toString() {
+			return name;
+		}
+
+	}
+
+	public static class K2HttpServletRequestWrapper extends
+			HttpServletRequestWrapper implements HttpServletRequest {
+
+		private final Principal principal;
+
+		public K2HttpServletRequestWrapper(HttpServletRequest request,
+				Principal principal) {
+			super(request);
+			this.principal = principal;
+		}
+
+		/**
+		 * @see javax.servlet.http.HttpServletRequestWrapper#getRemoteUser()
+		 */
+		@Override
+		public String getRemoteUser() {
+			return principal != null ? this.principal.getName() : null;
+		}
+
+		/**
+		 * @see javax.servlet.http.HttpServletRequestWrapper#getUserPrincipal()
+		 */
+		@Override
+		public Principal getUserPrincipal() {
+			return this.principal;
+		}
+
+		/**
+		 * @see javax.servlet.http.HttpServletRequestWrapper#isUserInRole(java.lang.String)
+		 */
+		@Override
+		public boolean isUserInRole(String role) {
+			// not needed for this filter
+			return false;
+		}
+
 	}
 
 }

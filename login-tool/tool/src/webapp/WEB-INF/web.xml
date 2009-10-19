@@ -37,6 +37,16 @@
         <dispatcher>REQUEST</dispatcher>
     </filter-mapping>
 
+    <filter>
+        <filter-name>K2AuthenticationFilter</filter-name>
+        <filter-class>org.sakaiproject.login.filter.K2AuthenticationFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>K2AuthenticationFilter</filter-name>
+				<url-pattern>/container</url-pattern>
+    </filter-mapping>
+
     <servlet>
         <servlet-name>sakai.login</servlet-name>
         <servlet-class>org.sakaiproject.login.tool.LoginTool</servlet-class>
