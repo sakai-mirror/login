@@ -45,6 +45,7 @@ import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.sakaiproject.component.cover.ServerConfigurationService;
 
 /**
  * 
@@ -55,7 +56,16 @@ public class K2AuthenticationFilter implements Filter {
 	private static final String COOKIE_NAME = "SAKAI-TRACKING";
 	private static final String ANONYMOUS = "anonymous";
 
-	protected String vaildateUrl = "http://localhost:8080/var/cluster/user.cookie.json?c=";
+	/**
+	 * Filter will be bypassed unless enabled; see sakai.properties:
+	 * login.k2.authentication = true
+	 */
+	protected boolean filterEnabled = false;
+
+	/**
+	 * The K2 RESTful service to validate authenticated users
+	 */
+	protected String vaildateUrl = null;
 
 	/**
 	 * @see javax.servlet.Filter#doFilter(javax.servlet.ServletRequest,
@@ -69,7 +79,7 @@ public class K2AuthenticationFilter implements Filter {
 					+ ", ServletResponse " + servletResponse + ", FilterChain "
 					+ chain + ")");
 		}
-		if (servletRequest instanceof HttpServletRequest) {
+		if (filterEnabled && servletRequest instanceof HttpServletRequest) {
 			final HttpServletRequest request = (HttpServletRequest) servletRequest;
 			final HttpServletResponse response = (HttpServletResponse) servletResponse;
 
@@ -94,7 +104,8 @@ public class K2AuthenticationFilter implements Filter {
 							"response.isCommitted() && response.sendError(HttpServletResponse.SC_FORBIDDEN)");
 				}
 			}
-		} else { // not HttpServletRequest - just proceed with chain
+		} else { // not enabled or not HttpServletRequest - just proceed with
+			// chain
 			chain.doFilter(servletRequest, servletResponse);
 			return;
 		}
@@ -155,7 +166,27 @@ public class K2AuthenticationFilter implements Filter {
 	 * @see javax.servlet.Filter#init(javax.servlet.FilterConfig)
 	 */
 	public void init(FilterConfig filterConfig) throws ServletException {
-		// need some sakai.properties here to enable and configure this filter
+		LOG.debug("init(FilterConfig filterConfig)");
+		filterEnabled = ServerConfigurationService.getBoolean(
+				"login.k2.authentication", false);
+		if (filterEnabled) {
+			LOG.info("K2AuthenticationFilter ENABLED.");
+			vaildateUrl = ServerConfigurationService
+					.getString("login.k2.authentication.vaildateUrl");
+			LOG.info("vaildateUrl=" + vaildateUrl);
+			if (vaildateUrl == null || "".equals(vaildateUrl)) {
+				throw new IllegalStateException("Illegal vaildateUrl state!: "
+						+ vaildateUrl);
+			}
+			// make sure container.login is turned on as well
+			boolean containerLogin = ServerConfigurationService.getBoolean(
+					"container.login", false);
+			if (!containerLogin) {
+				throw new IllegalStateException(
+						"container.login must be enabled in sakai.properties!");
+			}
+			// what about top.login = false ?
+		}
 	}
 
 	/**
