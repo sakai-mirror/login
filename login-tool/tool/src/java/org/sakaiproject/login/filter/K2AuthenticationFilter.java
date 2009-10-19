@@ -122,7 +122,6 @@ public class K2AuthenticationFilter implements Filter {
 	}
 
 	private Principal getPrincipalLoggedIntoK2(HttpServletRequest request) {
-		// TODO complete this method
 		Principal principal = null;
 		final String secret = getSecret(request);
 		if (secret != null) {
@@ -133,15 +132,11 @@ public class K2AuthenticationFilter implements Filter {
 			try {
 				URI uri = new URI(vaildateUrl + secret);
 				HttpGet httpget = new HttpGet(uri);
-				// System.out.println("HttpGet: " + httpget.getURI());
 				ResponseHandler<String> responseHandler = new BasicResponseHandler();
 				String responseBody = http.execute(httpget, responseHandler);
-				// System.out.println(responseBody
-				// + "\n------------------------------------------------");
 				JSONObject jsonObject = JSONObject.fromObject(responseBody);
 				String p = jsonObject.getJSONObject("user").getString(
 						"principal");
-				// System.out.println("principal=" + p);
 				if (p != null && !"".equals(p) && !ANONYMOUS.equals(p)) {
 					// only if not null and not "anonymous"
 					principal = new K2Principal(p);
