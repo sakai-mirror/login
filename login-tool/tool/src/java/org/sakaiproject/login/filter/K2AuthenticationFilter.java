@@ -98,6 +98,7 @@ public class K2AuthenticationFilter implements Filter {
 				if (!response.isCommitted()) {
 					// TODO redirect to K2 login URL instead of 403
 					response.sendError(HttpServletResponse.SC_FORBIDDEN);
+					return;
 				} else {
 					// what to do here?
 					throw new Error(
@@ -126,6 +127,7 @@ public class K2AuthenticationFilter implements Filter {
 		final String secret = getSecret(request);
 		if (secret != null) {
 			DefaultHttpClient http = new DefaultHttpClient();
+			// TODO Complete basic authentication to K2 service when enabled.
 			// http.getCredentialsProvider().setCredentials(
 			// new AuthScope("localhost", 443),
 			// new UsernamePasswordCredentials("username", "password"));
