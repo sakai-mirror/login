@@ -24,6 +24,9 @@ package org.sakaiproject.login.filter;
 import java.io.IOException;
 import java.net.URI;
 import java.security.Principal;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -45,7 +48,18 @@ import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.sakaiproject.authz.api.AuthzGroupService;
 import org.sakaiproject.component.cover.ServerConfigurationService;
+import org.sakaiproject.event.api.EventTrackingService;
+import org.sakaiproject.event.api.UsageSessionService;
+import org.sakaiproject.tool.api.Session;
+import org.sakaiproject.tool.api.SessionManager;
+import org.sakaiproject.user.api.User;
+import org.sakaiproject.user.api.UserAlreadyDefinedException;
+import org.sakaiproject.user.api.UserDirectoryService;
+import org.sakaiproject.user.api.UserIdInvalidException;
+import org.sakaiproject.user.api.UserNotDefinedException;
+import org.sakaiproject.user.api.UserPermissionException;
 
 /**
  * 
@@ -55,6 +69,13 @@ public class K2AuthenticationFilter implements Filter {
 			.getLog(K2AuthenticationFilter.class);
 	private static final String COOKIE_NAME = "SAKAI-TRACKING";
 	private static final String ANONYMOUS = "anonymous";
+	private boolean autoProvisionUser = false;
+	private SessionManager sessionManager;
+	private UserDirectoryService userDirectoryService;
+	private UsageSessionService usageSessionService;
+	private EventTrackingService eventTrackingService;
+	private AuthzGroupService authzGroupService;
+	private SecureRandom random = new SecureRandom();
 
 	/**
 	 * Filter will be bypassed unless enabled; see sakai.properties:
@@ -83,15 +104,35 @@ public class K2AuthenticationFilter implements Filter {
 			final HttpServletRequest request = (HttpServletRequest) servletRequest;
 			final HttpServletResponse response = (HttpServletResponse) servletResponse;
 
-			final Principal principal = getPrincipalLoggedIntoK2(request);
+			final List<Object> list = getPrincipalLoggedIntoK2(request);
+			final Principal principal = (Principal) list.get(0);
 			if (principal != null) {
 				if (LOG.isDebugEnabled()) {
 					LOG.debug("Authenticated to K2 proceeding with chain: "
 							+ principal.getName());
 				}
-				final K2HttpServletRequestWrapper requestWrapper = new K2HttpServletRequestWrapper(
-						request, principal);
-				chain.doFilter(requestWrapper, servletResponse);
+				if (autoProvisionUser) {
+					LOG.debug("autoProvisionUser==true, provisioning user");
+					User user = null;
+					Throwable error = null;
+					try {
+						user = provisionUser(principal, (JSONObject) list
+								.get(1));
+					} catch (Throwable e) {
+						error = e;
+					}
+					if (user == null || error != null) {
+						if (!response.isCommitted()) {
+							response
+									.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+							return;
+						} else {
+							throw new IllegalStateException(error);
+						}
+					}
+				}
+				chain.doFilter(new K2HttpServletRequestWrapper(request,
+						principal), servletResponse);
 				return;
 			} else {
 				LOG.debug("NOT authenticated to K2.");
@@ -122,8 +163,9 @@ public class K2AuthenticationFilter implements Filter {
 		return secret;
 	}
 
-	private Principal getPrincipalLoggedIntoK2(HttpServletRequest request) {
+	private List<Object> getPrincipalLoggedIntoK2(HttpServletRequest request) {
 		Principal principal = null;
+		JSONObject jsonObject = null;
 		final String secret = getSecret(request);
 		if (secret != null) {
 			DefaultHttpClient http = new DefaultHttpClient();
@@ -136,7 +178,7 @@ public class K2AuthenticationFilter implements Filter {
 				HttpGet httpget = new HttpGet(uri);
 				ResponseHandler<String> responseHandler = new BasicResponseHandler();
 				String responseBody = http.execute(httpget, responseHandler);
-				JSONObject jsonObject = JSONObject.fromObject(responseBody);
+				jsonObject = JSONObject.fromObject(responseBody);
 				String p = jsonObject.getJSONObject("user").getString(
 						"principal");
 				if (p != null && !"".equals(p) && !ANONYMOUS.equals(p)) {
@@ -156,7 +198,67 @@ public class K2AuthenticationFilter implements Filter {
 			}
 		}
 
-		return principal;
+		List<Object> list = new ArrayList<Object>(2);
+		list.add(0, principal);
+		list.add(1, jsonObject);
+		return list;
+	}
+
+	private User provisionUser(Principal principal, JSONObject jsonObject) {
+		if (LOG.isDebugEnabled()) {
+			LOG.debug("provisionUser(Principal " + principal + ", JSONObject "
+					+ jsonObject + ")");
+		}
+		if (principal == null || jsonObject == null) {
+			throw new IllegalArgumentException(
+					"principal == null || jsonObject == null");
+		}
+		final Session currentSession = sessionManager.getCurrentSession();
+		User user = null;
+		try {
+			// does the user already exist?
+			try {
+				user = userDirectoryService.getUserByEid(principal.getName());
+			} catch (UserNotDefinedException e) {
+				// this is expected for users that do not exist
+				LOG.debug(e.getMessage(), e);
+			}
+
+			// create the new user if they do not exist
+			if (user == null) {
+				// first establish an admin session so we can create a new user
+				final Session adminSession = sessionManager.startSession();
+				adminSession.setUserId("admin");
+				adminSession.setUserEid("admin");
+				usageSessionService.startSession("admin", "127.0.0.1",
+						"K2AuthenticationFilter");
+				authzGroupService.refreshUser("admin");
+				eventTrackingService.post(eventTrackingService.newEvent(
+						UsageSessionService.EVENT_LOGIN, null, true));
+
+				final JSONObject properties = jsonObject.getJSONObject("user")
+						.getJSONObject("properties");
+				user = userDirectoryService.addUser(null, principal.getName(),
+						properties.getString("firstName"), properties
+								.getString("lastName"), properties
+								.getString("email"), Long.toString(random
+								.nextLong()), "k2AutoProvisioned", null);
+
+				// destroy the admin session to be safe
+				adminSession.invalidate();
+			}
+		} catch (UserAlreadyDefinedException e) {
+			// should never end up here as we already checked for existing user
+			throw new Error(e);
+		} catch (UserIdInvalidException e) {
+			throw new Error(e);
+		} catch (UserPermissionException e) {
+			throw new Error(e);
+		} finally {
+			// finally set the current session back to the previous state
+			sessionManager.setCurrentSession(currentSession);
+		}
+		return user;
 	}
 
 	/**
@@ -175,6 +277,10 @@ public class K2AuthenticationFilter implements Filter {
 				throw new IllegalStateException("Illegal vaildateUrl state!: "
 						+ vaildateUrl);
 			}
+			autoProvisionUser = ServerConfigurationService.getBoolean(
+					"login.k2.authentication.autoProvisionUser", false);
+			LOG.info("autoProvisionUser=" + autoProvisionUser);
+
 			// make sure container.login is turned on as well
 			boolean containerLogin = ServerConfigurationService.getBoolean(
 					"container.login", false);
@@ -183,6 +289,32 @@ public class K2AuthenticationFilter implements Filter {
 						"container.login must be enabled in sakai.properties!");
 			}
 			// what about top.login = false ?
+
+			sessionManager = org.sakaiproject.tool.cover.SessionManager
+					.getInstance();
+			if (sessionManager == null) {
+				throw new IllegalStateException("SessionManager == null");
+			}
+			userDirectoryService = org.sakaiproject.user.cover.UserDirectoryService
+					.getInstance();
+			if (userDirectoryService == null) {
+				throw new IllegalStateException("UserDirectoryService == null");
+			}
+			usageSessionService = org.sakaiproject.event.cover.UsageSessionService
+					.getInstance();
+			if (usageSessionService == null) {
+				throw new IllegalStateException("UsageSessionService == null");
+			}
+			eventTrackingService = org.sakaiproject.event.cover.EventTrackingService
+					.getInstance();
+			if (eventTrackingService == null) {
+				throw new IllegalStateException("EventTrackingService == null");
+			}
+			authzGroupService = org.sakaiproject.authz.cover.AuthzGroupService
+					.getInstance();
+			if (authzGroupService == null) {
+				throw new IllegalStateException("AuthzGroupService == null");
+			}
 		}
 	}
 
