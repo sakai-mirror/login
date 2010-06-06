@@ -49,6 +49,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.sakaiproject.authz.api.AuthzGroupService;
+import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.event.api.EventTrackingService;
 import org.sakaiproject.event.api.UsageSessionService;
@@ -290,28 +291,28 @@ public class K2AuthenticationFilter implements Filter {
 			}
 			// what about top.login = false ?
 
-			sessionManager = org.sakaiproject.tool.cover.SessionManager
-					.getInstance();
+			sessionManager = (SessionManager) ComponentManager
+					.get(SessionManager.class);
 			if (sessionManager == null) {
 				throw new IllegalStateException("SessionManager == null");
 			}
-			userDirectoryService = org.sakaiproject.user.cover.UserDirectoryService
-					.getInstance();
+			userDirectoryService = (UserDirectoryService) ComponentManager
+					.get(UserDirectoryService.class);
 			if (userDirectoryService == null) {
 				throw new IllegalStateException("UserDirectoryService == null");
 			}
-			usageSessionService = org.sakaiproject.event.cover.UsageSessionService
-					.getInstance();
+			usageSessionService = (UsageSessionService) ComponentManager
+					.get(UsageSessionService.class);
 			if (usageSessionService == null) {
 				throw new IllegalStateException("UsageSessionService == null");
 			}
-			eventTrackingService = org.sakaiproject.event.cover.EventTrackingService
-					.getInstance();
+			eventTrackingService = (EventTrackingService) ComponentManager
+					.get(EventTrackingService.class);
 			if (eventTrackingService == null) {
 				throw new IllegalStateException("EventTrackingService == null");
 			}
-			authzGroupService = org.sakaiproject.authz.cover.AuthzGroupService
-					.getInstance();
+			authzGroupService = (AuthzGroupService) ComponentManager
+					.get(AuthzGroupService.class);
 			if (authzGroupService == null) {
 				throw new IllegalStateException("AuthzGroupService == null");
 			}
