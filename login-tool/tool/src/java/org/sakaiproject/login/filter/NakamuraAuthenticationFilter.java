@@ -61,13 +61,14 @@ import org.sakaiproject.user.api.UserDirectoryService;
 import org.sakaiproject.user.api.UserIdInvalidException;
 import org.sakaiproject.user.api.UserNotDefinedException;
 import org.sakaiproject.user.api.UserPermissionException;
+import org.sakaiproject.util.XSakaiToken;
 
 /**
  * 
  */
-public class K2AuthenticationFilter implements Filter {
+public class NakamuraAuthenticationFilter implements Filter {
 	private static final Log LOG = LogFactory
-			.getLog(K2AuthenticationFilter.class);
+			.getLog(NakamuraAuthenticationFilter.class);
 	private static final String COOKIE_NAME = "SAKAI-TRACKING";
 	private static final String ANONYMOUS = "anonymous";
 	private boolean autoProvisionUser = false;
@@ -84,10 +85,31 @@ public class K2AuthenticationFilter implements Filter {
 	 */
 	protected boolean filterEnabled = false;
 
+	public static final String CONFIG_PREFIX = "org.sakaiproject.login.filter.NakamuraAuthenticationFilter";
+	public static final String CONFIG_ENABLED = CONFIG_PREFIX + ".enabled";
+	public static final String CONFIG_PRINCIPAL = CONFIG_PREFIX + ".principal";
+	public static final String CONFIG_HOST_NAME = CONFIG_PREFIX + ".hostname";
+	public static final String CONFIG_VALIDATE_URL = CONFIG_PREFIX
+			+ ".validateUrl";
+	public static final String CONFIG_AUTO_PROVISION_USER = CONFIG_PREFIX
+			+ ".autoProvisionUser";
+
 	/**
-	 * The K2 RESTful service to validate authenticated users
+	 * The Nakamura RESTful service to validate authenticated users
 	 */
-	protected String vaildateUrl = null;
+	protected String validateUrl = "http://localhost/var/cluster/user.cookie.json?c=";
+
+	/**
+	 * The nakamura user that has permissions to GET
+	 * /var/cluster/user.cookie.json.
+	 */
+	protected String principal = "admin";
+
+	/**
+	 * The hostname we will use to lookup the sharedSecret for access to
+	 * validateUrl.
+	 */
+	protected String hostname = "localhost";
 
 	/**
 	 * @see javax.servlet.Filter#doFilter(javax.servlet.ServletRequest,
@@ -170,13 +192,13 @@ public class K2AuthenticationFilter implements Filter {
 		final String secret = getSecret(request);
 		if (secret != null) {
 			DefaultHttpClient http = new DefaultHttpClient();
-			// TODO Complete basic authentication to K2 service when enabled.
-			// http.getCredentialsProvider().setCredentials(
-			// new AuthScope("localhost", 443),
-			// new UsernamePasswordCredentials("username", "password"));
 			try {
-				URI uri = new URI(vaildateUrl + secret);
+				URI uri = new URI(validateUrl + secret);
 				HttpGet httpget = new HttpGet(uri);
+				// authenticate to Nakamura using x-sakai-token mechanism
+				final String token = XSakaiToken.createToken(hostname,
+						this.principal);
+				httpget.addHeader(XSakaiToken.X_SAKAI_TOKEN_HEADER, token);
 				ResponseHandler<String> responseHandler = new BasicResponseHandler();
 				String responseBody = http.execute(httpget, responseHandler);
 				jsonObject = JSONObject.fromObject(responseBody);
@@ -190,7 +212,7 @@ public class K2AuthenticationFilter implements Filter {
 				// usually a 404 error - could not find cookie / not valid
 				if (LOG.isDebugEnabled()) {
 					LOG.debug("HttpResponseException: " + e.getMessage() + ": "
-							+ e.getStatusCode() + ": " + vaildateUrl + secret);
+							+ e.getStatusCode() + ": " + validateUrl + secret);
 				}
 			} catch (Exception e) {
 				LOG.error(e.getMessage(), e);
@@ -232,7 +254,7 @@ public class K2AuthenticationFilter implements Filter {
 				adminSession.setUserId("admin");
 				adminSession.setUserEid("admin");
 				usageSessionService.startSession("admin", "127.0.0.1",
-						"K2AuthenticationFilter");
+						"NakamuraAuthenticationFilter");
 				authzGroupService.refreshUser("admin");
 				eventTrackingService.post(eventTrackingService.newEvent(
 						UsageSessionService.EVENT_LOGIN, null, true));
@@ -267,19 +289,21 @@ public class K2AuthenticationFilter implements Filter {
 	 */
 	public void init(FilterConfig filterConfig) throws ServletException {
 		LOG.debug("init(FilterConfig filterConfig)");
-		filterEnabled = ServerConfigurationService.getBoolean(
-				"login.k2.authentication", false);
+		filterEnabled = ServerConfigurationService.getBoolean(CONFIG_ENABLED,
+				filterEnabled);
 		if (filterEnabled) {
-			LOG.info("K2AuthenticationFilter ENABLED.");
-			vaildateUrl = ServerConfigurationService
-					.getString("login.k2.authentication.vaildateUrl");
-			LOG.info("vaildateUrl=" + vaildateUrl);
-			if (vaildateUrl == null || "".equals(vaildateUrl)) {
-				throw new IllegalStateException("Illegal vaildateUrl state!: "
-						+ vaildateUrl);
-			}
+			LOG.info("NakamuraAuthenticationFilter ENABLED.");
+			validateUrl = ServerConfigurationService.getString(
+					CONFIG_VALIDATE_URL, validateUrl);
+			LOG.info("vaildateUrl=" + validateUrl);
+			principal = ServerConfigurationService.getString(CONFIG_PRINCIPAL,
+					principal);
+			LOG.info("principal=" + principal);
+			hostname = ServerConfigurationService.getString(CONFIG_HOST_NAME,
+					hostname);
+			LOG.info("hostname=" + hostname);
 			autoProvisionUser = ServerConfigurationService.getBoolean(
-					"login.k2.authentication.autoProvisionUser", false);
+					CONFIG_AUTO_PROVISION_USER, autoProvisionUser);
 			LOG.info("autoProvisionUser=" + autoProvisionUser);
 
 			// make sure container.login is turned on as well

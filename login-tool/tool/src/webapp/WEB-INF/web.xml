@@ -38,12 +38,12 @@
     </filter-mapping>
 
     <filter>
-        <filter-name>K2AuthenticationFilter</filter-name>
-        <filter-class>org.sakaiproject.login.filter.K2AuthenticationFilter</filter-class>
+        <filter-name>NakamuraAuthenticationFilter</filter-name>
+        <filter-class>org.sakaiproject.login.filter.NakamuraAuthenticationFilter</filter-class>
     </filter>
 
     <filter-mapping>
-        <filter-name>K2AuthenticationFilter</filter-name>
+        <filter-name>NakamuraAuthenticationFilter</filter-name>
 				<url-pattern>/container</url-pattern>
     </filter-mapping>
 
