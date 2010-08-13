@@ -241,7 +241,9 @@ public class LoginTool extends HttpServlet
 		// PDA or not?
 		String portalUrl = (String) session.getAttribute(Tool.HELPER_DONE_URL);
 		boolean isPDA = false;
-		if ( portalUrl != null ) isPDA = portalUrl.endsWith(PDA_PORTAL_SUFFIX);
+		if ( portalUrl != null ) {
+			isPDA = (portalUrl.indexOf (PDA_PORTAL_SUFFIX) > 0);
+		}
 
 		String eidWording = rb.getString("userid");
 		String pwWording = rb.getString("log.pass");
