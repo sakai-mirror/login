@@ -139,15 +139,14 @@ public class NakamuraAuthenticationFilter implements Filter {
 					User user = null;
 					Throwable error = null;
 					try {
-						user = provisionUser(principal, (JSONObject) list
-								.get(1));
+						user = provisionUser(principal,
+								(JSONObject) list.get(1));
 					} catch (Throwable e) {
 						error = e;
 					}
 					if (user == null || error != null) {
 						if (!response.isCommitted()) {
-							response
-									.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+							response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 							return;
 						} else {
 							throw new IllegalStateException(error);
@@ -178,9 +177,12 @@ public class NakamuraAuthenticationFilter implements Filter {
 
 	private String getSecret(HttpServletRequest req) {
 		String secret = null;
-		for (Cookie cookie : req.getCookies()) {
-			if (COOKIE_NAME.equals(cookie.getName())) {
-				secret = cookie.getValue();
+		final Cookie[] cookies = req.getCookies();
+		if (cookies != null) {
+			for (Cookie cookie : cookies) {
+				if (COOKIE_NAME.equals(cookie.getName())) {
+					secret = cookie.getValue();
+				}
 			}
 		}
 		return secret;
@@ -262,10 +264,11 @@ public class NakamuraAuthenticationFilter implements Filter {
 				final JSONObject properties = jsonObject.getJSONObject("user")
 						.getJSONObject("properties");
 				user = userDirectoryService.addUser(null, principal.getName(),
-						properties.getString("firstName"), properties
-								.getString("lastName"), properties
-								.getString("email"), Long.toString(random
-								.nextLong()), "k2AutoProvisioned", null);
+						properties.getString("firstName"),
+						properties.getString("lastName"),
+						properties.getString("email"),
+						Long.toString(random.nextLong()), "k2AutoProvisioned",
+						null);
 
 				// destroy the admin session to be safe
 				adminSession.invalidate();
