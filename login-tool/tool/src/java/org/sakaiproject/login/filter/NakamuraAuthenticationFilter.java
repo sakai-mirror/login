@@ -71,7 +71,6 @@ public class NakamuraAuthenticationFilter implements Filter {
 			.getLog(NakamuraAuthenticationFilter.class);
 	private static final String COOKIE_NAME = "SAKAI-TRACKING";
 	private static final String ANONYMOUS = "anonymous";
-	private boolean autoProvisionUser = false;
 	private SessionManager sessionManager;
 	private UserDirectoryService userDirectoryService;
 	private UsageSessionService usageSessionService;
@@ -133,25 +132,6 @@ public class NakamuraAuthenticationFilter implements Filter {
 				if (LOG.isDebugEnabled()) {
 					LOG.debug("Authenticated to K2 proceeding with chain: "
 							+ principal.getName());
-				}
-				if (autoProvisionUser) {
-					LOG.debug("autoProvisionUser==true, provisioning user");
-					User user = null;
-					Throwable error = null;
-					try {
-						user = provisionUser(principal,
-								(JSONObject) list.get(1));
-					} catch (Throwable e) {
-						error = e;
-					}
-					if (user == null || error != null) {
-						if (!response.isCommitted()) {
-							response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-							return;
-						} else {
-							throw new IllegalStateException(error);
-						}
-					}
 				}
 				chain.doFilter(new K2HttpServletRequestWrapper(request,
 						principal), servletResponse);
@@ -229,64 +209,6 @@ public class NakamuraAuthenticationFilter implements Filter {
 		return list;
 	}
 
-	private User provisionUser(Principal principal, JSONObject jsonObject) {
-		if (LOG.isDebugEnabled()) {
-			LOG.debug("provisionUser(Principal " + principal + ", JSONObject "
-					+ jsonObject + ")");
-		}
-		if (principal == null || jsonObject == null) {
-			throw new IllegalArgumentException(
-					"principal == null || jsonObject == null");
-		}
-		final Session currentSession = sessionManager.getCurrentSession();
-		User user = null;
-		try {
-			// does the user already exist?
-			try {
-				user = userDirectoryService.getUserByEid(principal.getName());
-			} catch (UserNotDefinedException e) {
-				// this is expected for users that do not exist
-				LOG.debug(e.getMessage(), e);
-			}
-
-			// create the new user if they do not exist
-			if (user == null) {
-				// first establish an admin session so we can create a new user
-				final Session adminSession = sessionManager.startSession();
-				adminSession.setUserId("admin");
-				adminSession.setUserEid("admin");
-				usageSessionService.startSession("admin", "127.0.0.1",
-						"NakamuraAuthenticationFilter");
-				authzGroupService.refreshUser("admin");
-				eventTrackingService.post(eventTrackingService.newEvent(
-						UsageSessionService.EVENT_LOGIN, null, true));
-
-				final JSONObject properties = jsonObject.getJSONObject("user")
-						.getJSONObject("properties");
-				user = userDirectoryService.addUser(null, principal.getName(),
-						properties.getString("firstName"),
-						properties.getString("lastName"),
-						properties.getString("email"),
-						Long.toString(random.nextLong()), "k2AutoProvisioned",
-						null);
-
-				// destroy the admin session to be safe
-				adminSession.invalidate();
-			}
-		} catch (UserAlreadyDefinedException e) {
-			// should never end up here as we already checked for existing user
-			throw new Error(e);
-		} catch (UserIdInvalidException e) {
-			throw new Error(e);
-		} catch (UserPermissionException e) {
-			throw new Error(e);
-		} finally {
-			// finally set the current session back to the previous state
-			sessionManager.setCurrentSession(currentSession);
-		}
-		return user;
-	}
-
 	/**
 	 * @see javax.servlet.Filter#init(javax.servlet.FilterConfig)
 	 */
@@ -305,9 +227,6 @@ public class NakamuraAuthenticationFilter implements Filter {
 			hostname = ServerConfigurationService.getString(CONFIG_HOST_NAME,
 					hostname);
 			LOG.info("hostname=" + hostname);
-			autoProvisionUser = ServerConfigurationService.getBoolean(
-					CONFIG_AUTO_PROVISION_USER, autoProvisionUser);
-			LOG.info("autoProvisionUser=" + autoProvisionUser);
 
 			// make sure container.login is turned on as well
 			boolean containerLogin = ServerConfigurationService.getBoolean(
